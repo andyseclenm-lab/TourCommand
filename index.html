@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TourCommand</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            background: 'var(--color-background)',
+            surface: 'var(--color-surface)',
+            primary: 'var(--color-primary)',
+            secondary: 'var(--color-secondary)',
+            text: 'var(--color-text)',
+            muted: 'var(--color-text-muted)',
+            border: 'var(--color-border)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --color-background: #101022;
+      --color-surface: #191933;
+      --color-primary: #1313ec;
+      --color-secondary: #9292c9;
+      --color-primary: #1313ec;
+      --color-secondary: #9292c9;
+      --color-text: #ffffff;
+      --color-text-muted: #9ca3af;
+      --color-border: rgba(255, 255, 255, 0.1);
+    }
+
+    body {
+      background-color: var(--color-background);
+      color: var(--color-text);
+    }
+
+    /* Custom scrollbar to keep UI clean */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--color-background);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #232348;
+      border-radius: 3px;
+    }
+  </style>
+
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>
