@@ -4,12 +4,18 @@ import {
   Utensils, Download, Mic, DoorOpen, Music, Package, MessageSquare,
   Phone, Mail, Plus, Camera, Trash2, User, Plane, BedDouble, ChevronRight,
   Pencil, X, Save, Globe, Clock, MoreVertical, AlignLeft, Search,
-  ChevronDown, ChevronUp, CheckCircle, AlertCircle, Users, Briefcase, ClipboardList
+  ChevronDown, ChevronUp, CheckCircle, AlertCircle, Users, Briefcase, ClipboardList, Activity
 } from 'lucide-react';
 import EditEventModal from '../components/EditEventModal';
-import { useNavigate, useLocation } from 'react-router-dom';
+import CreatableSelect from '../components/CreatableSelect';
+import ShareTourModal from '../components/ShareTourModal';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTour } from '../context/TourContext';
 import { ScheduleItem, DocumentItem, Contact } from '../types';
+import { supabase } from '../lib/supabase';
+
+const LOCATION_OPTIONS = ['HOTEL', 'VENUE', 'ESTACIÓN', 'AEROPUERTO', 'RESTAURANTE', 'PRENSA', 'OTROS'];
+const ACTIVITY_OPTIONS = ['LOAD IN TECNICOS', 'LOAD IN ARTISTAS', 'SHOWTIME', 'APERTURA DE PUERTAS', 'FIN SHOW', 'CURFEW ESCENARIO', 'CURFEW VENUE', 'MEETING', 'RUEDA DE PRENSA', 'OTROS'];
 
 // Helper: Matches "ene", "feb", "mar"... to month index 0-11
 const monthMap: Record<string, number> = {
@@ -27,27 +33,18 @@ const parseEventDate = (dateStr: string) => {
 
   let day = -1, month = -1, year = new Date().getFullYear();
 
-  // Check for "DD MMM YYYY" or "YYYY-MM-DD"
-  if (parts.length >= 3) {
-    // Iso-like YYYY-MM-DD
-    if (parts[0].length === 4 && !isNaN(Number(parts[0]))) {
-      year = Number(parts[0]);
-      month = Number(parts[1]) - 1;
-      day = Number(parts[2]);
-    } else {
-      // Natural "25 feb 2026"
-      day = parseInt(parts[0]);
-      const monthStr = parts.find(p => isNaN(Number(p)) && p.length >= 3);
-      const yearStr = parts.find(p => !isNaN(Number(p)) && p.length === 4);
+  const yearStr = parts.find(p => !isNaN(Number(p)) && p.length === 4);
+  if (yearStr) year = parseInt(yearStr);
 
-      if (monthStr) {
-        Object.keys(monthMap).forEach(k => {
-          if (monthStr.startsWith(k)) month = monthMap[k];
-        });
-      }
-      if (yearStr) year = parseInt(yearStr);
-    }
+  const monthStr = parts.find(p => isNaN(Number(p)) && p.length >= 3);
+  if (monthStr) {
+    Object.keys(monthMap).forEach(k => {
+      if (monthStr.startsWith(k)) month = monthMap[k];
+    });
   }
+
+  const dayStr = parts.find(p => !isNaN(Number(p)) && p.length <= 2);
+  if (dayStr) day = parseInt(dayStr);
 
   if (day !== -1 && month !== -1) {
     return new Date(year, month, day);
@@ -188,6 +185,9 @@ const VenueDetails: React.FC = () => {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [tempProjectData, setTempProjectData] = useState(projectData);
   const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState<DocumentItem | null>(null);
@@ -420,9 +420,38 @@ const VenueDetails: React.FC = () => {
   const [tempScheduleItem, setTempScheduleItem] = useState<Partial<ScheduleItem>>({ startTime: '', activity: '', type: 'logistics' });
 
   // --- Handlers: Banner ---
-  const handleImageUpload = () => {
-    const newUrl = prompt("Introduce la URL de la nueva imagen:", bannerImage);
-    if (newUrl) setBannerImage(newUrl);
+  const handleImageUploadClick = () => {
+    if (fileInputRef.current) fileInputRef.current.click();
+  };
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !liveEvent) return;
+
+    setIsUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${liveEvent.id}-${Math.random()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('event_images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('event_images')
+        .getPublicUrl(fileName);
+
+      setBannerImage(publicUrl);
+      updateEvent({ ...liveEvent, image: publicUrl });
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      alert('Hubo un error al subir la imagen.');
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleDeleteImage = () => {
@@ -614,13 +643,21 @@ const VenueDetails: React.FC = () => {
 
       {/* --- MODALS --- */}
       {liveEvent && (
-        <EditEventModal
-          isOpen={isEditEventModalOpen}
-          onClose={() => setIsEditEventModalOpen(false)}
-          onSave={updateEvent}
-          event={liveEvent}
-          title="Modificar Evento"
-        />
+        <>
+          <EditEventModal
+            isOpen={isEditEventModalOpen}
+            onClose={() => setIsEditEventModalOpen(false)}
+            onSave={updateEvent}
+            event={liveEvent}
+            title="Modificar Evento"
+          />
+          <ShareTourModal
+            isOpen={isShareModalOpen}
+            onClose={() => setIsShareModalOpen(false)}
+            eventId={liveEvent.id}
+            tourName={projectData.projectName}
+          />
+        </>
       )}
       {/* [Existing Modal Code omitted for brevity, logic remains the same] */}
       {isEditContactModalOpen && (
@@ -818,14 +855,23 @@ const VenueDetails: React.FC = () => {
                   <input type="datetime-local" value={tempScheduleItem.endTime || ''} onChange={e => setTempScheduleItem({ ...tempScheduleItem, endTime: e.target.value })} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-text outline-none focus:border-primary [color-scheme:dark]" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-muted mb-1">Actividad</label>
-                <input required type="text" placeholder="ej: Prueba de Sonido" value={tempScheduleItem.activity} onChange={e => setTempScheduleItem({ ...tempScheduleItem, activity: e.target.value })} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-text outline-none focus:border-primary" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted mb-1">Ubicación</label>
-                <input type="text" placeholder="ej: Escenario Principal" value={tempScheduleItem.location || ''} onChange={e => setTempScheduleItem({ ...tempScheduleItem, location: e.target.value })} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-text outline-none focus:border-primary" />
-              </div>
+              <CreatableSelect
+                label="Actividad"
+                value={tempScheduleItem.activity}
+                onChange={val => setTempScheduleItem({ ...tempScheduleItem, activity: val })}
+                options={ACTIVITY_OPTIONS}
+                placeholder="ej: Prueba de Sonido"
+                icon={<Activity size={16} />}
+                required
+              />
+              <CreatableSelect
+                label="Ubicación"
+                value={tempScheduleItem.location || ''}
+                onChange={val => setTempScheduleItem({ ...tempScheduleItem, location: val })}
+                options={LOCATION_OPTIONS}
+                placeholder="ej: Escenario Principal"
+                icon={<MapPin size={16} />}
+              />
               <div>
                 <label className="block text-sm font-medium text-muted mb-1">Tipo</label>
                 <select value={tempScheduleItem.type} onChange={e => setTempScheduleItem({ ...tempScheduleItem, type: e.target.value as any })} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-text outline-none focus:border-primary">
@@ -1016,10 +1062,24 @@ const VenueDetails: React.FC = () => {
           {/* Banner Actions */}
           <div className="absolute top-4 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
-              onClick={handleImageUpload}
-              className="flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-black/80 transition-colors border border-border"
+              onClick={() => setIsShareModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-primary/80 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-primary transition-colors border border-primary/50"
             >
-              <Camera size={14} /> Modificar
+              <Users size={14} /> Compartir
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageFileChange}
+              accept="image/*"
+              className="hidden"
+            />
+            <button
+              onClick={handleImageUploadClick}
+              disabled={isUploadingImage}
+              className="flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-black/80 transition-colors border border-border disabled:opacity-50"
+            >
+              <Camera size={14} /> {isUploadingImage ? 'Subiendo...' : 'Modificar'}
             </button>
             <button
               onClick={handleDeleteImage}

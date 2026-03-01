@@ -91,7 +91,7 @@ const Sidebar = () => {
       <div className="p-4 border-t border-border">
         <div className="bg-background rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:bg-surface transition-colors border border-border">
           <img
-            src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80"
+            src={user?.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80"}
             alt="User"
             className="w-9 h-9 rounded-full object-cover ring-2 ring-white/10"
           />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Plus, Trash2, Pencil, Save, X, Pin, Clock, Tag, AlertTriangle, User, Users, Calendar, Check, MessageCircle, Send, CheckCircle, Circle, MoreHorizontal } from 'lucide-react';
 import { useTour } from '../context/TourContext';
+import { useAuth } from '../context/AuthContext';
 import { Note, NoteReply } from '../types';
 import CreatableSelect from '../components/CreatableSelect';
 
@@ -11,6 +12,7 @@ const DEPARTMENTS = ['Producción', 'Técnico', 'Promoción', 'Logística', 'Art
 const Notes: React.FC = () => {
     const navigate = useNavigate();
     const { notes, addNote, updateNote, deleteNote, events, contacts, addNoteReply } = useTour();
+    const { user } = useAuth();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterUrgency, setFilterUrgency] = useState<string>('All');
@@ -98,8 +100,8 @@ const Notes: React.FC = () => {
 
         const reply: NoteReply = {
             id: Date.now().toString(),
-            author: 'Alex Morgan',
-            avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80',
+            author: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario',
+            avatar: user?.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80',
             content: newReply,
             date: 'Justo ahora'
         };
@@ -258,9 +260,14 @@ const Notes: React.FC = () => {
                                             className="w-full bg-[#0c0c1a] border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-primary"
                                         >
                                             <option value="">Ninguno</option>
-                                            {events
-                                                .filter(ev => (ev.status === 'Active' || ev.status === 'Planning') && !ev.parent_id)
-                                                .map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+                                            {events.map(ev => {
+                                                // If it's a child event (like a concert in a city), find the parent tour name
+                                                const parentEvent = ev.parent_id ? events.find(e => e.id === ev.parent_id) : null;
+                                                const tourName = parentEvent ? parentEvent.title.toUpperCase() : ev.title.toUpperCase();
+                                                const locationSuffix = ev.location ? ev.location.toUpperCase() : 'GLOBAL';
+                                                const displayName = `${tourName}: ${locationSuffix}`;
+                                                return <option key={ev.id} value={ev.id}>{displayName}</option>;
+                                            })}
                                         </select>
                                     </div>
                                     <div>
@@ -321,7 +328,7 @@ const Notes: React.FC = () => {
                                             </div>
                                         ) : (
                                             editingNote.replies.map((reply) => {
-                                                const isMe = reply.author === 'Alex Morgan'; // Simulating current user
+                                                const isMe = reply.author === (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario');
                                                 return (
                                                     <div key={reply.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
                                                         <img src={reply.avatar} className="w-6 h-6 rounded-full object-cover mt-1" alt={reply.author} />

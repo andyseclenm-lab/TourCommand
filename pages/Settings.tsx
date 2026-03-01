@@ -22,7 +22,8 @@ const Settings: React.FC = () => {
         email: user?.email || '',
         phone: user?.user_metadata?.phone || '',
         location: user?.user_metadata?.location || '',
-        bio: user?.user_metadata?.bio || ''
+        bio: user?.user_metadata?.bio || '',
+        avatar_url: user?.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80'
     });
 
     // Update local state when user loads
@@ -34,7 +35,8 @@ const Settings: React.FC = () => {
                 email: user.email || '',
                 phone: user.user_metadata.phone || '',
                 location: user.user_metadata.location || '',
-                bio: user.user_metadata.bio || ''
+                bio: user.user_metadata.bio || '',
+                avatar_url: user.user_metadata.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80'
             });
         }
     }, [user]);
@@ -100,6 +102,7 @@ const Settings: React.FC = () => {
                         phone: profileData.phone,
                         location: profileData.location,
                         bio: profileData.bio,
+                        avatar_url: profileData.avatar_url,
                         notifications: notifications,
                         preferences: preferences
                     }
@@ -230,9 +233,12 @@ const Settings: React.FC = () => {
                         {activeTab === 'profile' && (
                             <div className="space-y-6">
                                 <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-border">
-                                    <div className="relative group cursor-pointer">
+                                    <div className="relative group cursor-pointer" onClick={() => {
+                                        const newUrl = prompt("Introduce la URL de tu nuevo avatar:", profileData.avatar_url);
+                                        if (newUrl) setProfileData({ ...profileData, avatar_url: newUrl });
+                                    }}>
                                         <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/5">
-                                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80" alt="Avatar" className="w-full h-full object-cover" />
+                                            <img src={profileData.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                                         </div>
                                         <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                             <Camera size={24} className="text-text" />
@@ -241,7 +247,13 @@ const Settings: React.FC = () => {
                                     <div className="text-center sm:text-left">
                                         <h2 className="text-xl font-bold text-text">{profileData.name}</h2>
                                         <p className="text-muted text-sm">{profileData.role}</p>
-                                        <button className="mt-3 text-xs font-bold text-primary hover:text-text transition-colors bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20">
+                                        <button
+                                            onClick={() => {
+                                                const newUrl = prompt("Introduce la URL de tu nuevo avatar:", profileData.avatar_url);
+                                                if (newUrl) setProfileData({ ...profileData, avatar_url: newUrl });
+                                            }}
+                                            className="mt-3 text-xs font-bold text-primary hover:text-text transition-colors bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/20"
+                                        >
                                             Cambiar Avatar
                                         </button>
                                     </div>

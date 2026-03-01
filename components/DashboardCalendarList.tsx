@@ -18,34 +18,31 @@ const DashboardCalendarList: React.FC<DashboardCalendarListProps> = ({ events })
         if (dateStr.includes('T')) return new Date(dateStr); // ISO
 
         const months: Record<string, number> = {
-            'ene': 0, 'feb': 1, 'mar': 2, 'abr': 3, 'may': 4, 'jun': 5,
-            'jul': 6, 'ago': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11
+            'ene': 0, 'enero': 0, 'jan': 0, 'feb': 1, 'febrero': 1, 'mar': 2, 'marzo': 2,
+            'abr': 3, 'abril': 3, 'apr': 3, 'may': 4, 'mayo': 4, 'jun': 5, 'junio': 5,
+            'jul': 6, 'julio': 6, 'ago': 7, 'agosto': 7, 'aug': 7, 'sep': 8, 'septiembre': 8, 'set': 8,
+            'oct': 9, 'octubre': 9, 'nov': 10, 'noviembre': 10, 'dic': 11, 'diciembre': 11, 'dec': 11
         };
 
-        const cleanStr = dateStr.toLowerCase().replace(/,/g, '').replace(/\./g, '');
+        const cleanStr = dateStr.toLowerCase().replace(/,/g, '').replace(/\./g, '').trim();
         const parts = cleanStr.split(/[\s-]+/);
 
-        // Attempt parse DD MMM YYYY or YYYY-MM-DD
         let day = currentDate.getDate();
         let month = currentDate.getMonth();
         let year = currentDate.getFullYear();
 
-        if (parts[0].length === 4) { // YYYY-MM-DD
-            return new Date(dateStr);
+        const yearStr = parts.find(p => !isNaN(Number(p)) && p.length === 4);
+        if (yearStr) year = parseInt(yearStr);
+
+        const monthStr = parts.find(p => isNaN(Number(p)) && p.length >= 3);
+        if (monthStr) {
+            Object.keys(months).forEach(k => {
+                if (monthStr.startsWith(k)) month = months[k];
+            });
         }
 
-        // 27 feb 2026
-        if (parts.length >= 3) {
-            day = parseInt(parts[0]);
-            const mStr = parts[1].substring(0, 3);
-            month = months[mStr] !== undefined ? months[mStr] : 0;
-            year = parseInt(parts[parts.length - 1]);
-        }
-        // Handle Ranges like "27 Jul - 05 Ago 2026"? For now simple check
-        else if (dateStr.includes('-')) {
-            // If range, try parsing first part + year from end?
-            // Fallback to current year if ambiguous
-        }
+        const dayStr = parts.find(p => !isNaN(Number(p)) && p.length <= 2);
+        if (dayStr) day = parseInt(dayStr);
 
         const d = new Date(year, month, day);
         return isNaN(d.getTime()) ? new Date() : d;

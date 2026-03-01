@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Calendar, MapPin, ChevronRight, Music, Filter, Mic2, Tent, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, ChevronRight, Music, Filter, Mic2, Tent, LayoutGrid, List, Trash2 } from 'lucide-react';
 import { useTour } from '../context/TourContext';
 import { Event } from '../types';
 
 const Events: React.FC = () => {
   const navigate = useNavigate();
-  const { events } = useTour();
+  const { events, deleteEvent } = useTour();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -141,11 +141,23 @@ const Events: React.FC = () => {
                 style={{ backgroundImage: `url("${event.image || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?ixlib=rb-4.0.3'}")` }}
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-surface via-transparent to-transparent sm:bg-gradient-to-r sm:from-transparent sm:to-surface/10"></div>
-                <div className="absolute top-3 right-3">
+                <div className="absolute top-3 right-3 flex items-center gap-2">
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${getStatusColor(event.status)}`}>
                     {event.status.toLowerCase() === 'active' && <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>}
                     {event.status}
                   </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`¿Estás seguro de que quieres eliminar el evento "${event.title}" y todo su contenido?`)) {
+                        deleteEvent(event.id);
+                      }
+                    }}
+                    className="p-1.5 bg-black/60 rounded-full text-gray-300 hover:text-red-400 hover:bg-black/80 transition-colors"
+                    title="Eliminar Evento"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
                 {viewMode === 'grid' && (
                   <div className="absolute bottom-4 left-4 right-4">

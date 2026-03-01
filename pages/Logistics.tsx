@@ -48,22 +48,24 @@ const Logistics: React.FC = () => {
     };
     const cleanStr = dateStr.toLowerCase().replace(/,/g, '').replace(/\./g, '').trim();
     const parts = cleanStr.split(/[\s-]+/);
-    if (parts.length >= 3) {
-      let day = -1, month = -1, year = -1;
-      if (parts[0].length === 4 && !isNaN(Number(parts[0]))) { // YYYY-MM-DD
-        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      } else if (parts[2].length === 4) { // DD MMM YYYY
-        day = Number(parts[0]);
-        year = Number(parts[2]);
-        const monthPart = parts[1];
-        let found = monthMap[monthPart];
-        if (found === undefined) {
-          const key = Object.keys(monthMap).find(k => monthPart.startsWith(k));
-          if (key) found = monthMap[key];
-        }
-        if (found !== undefined) month = found;
-        return new Date(year, month, day);
-      }
+
+    let day = -1, month = -1, year = new Date().getFullYear();
+
+    const yearStr = parts.find(p => !isNaN(Number(p)) && p.length === 4);
+    if (yearStr) year = parseInt(yearStr);
+
+    const monthStr = parts.find(p => isNaN(Number(p)) && p.length >= 3);
+    if (monthStr) {
+      Object.keys(monthMap).forEach(k => {
+        if (monthStr.startsWith(k)) month = monthMap[k];
+      });
+    }
+
+    const dayStr = parts.find(p => !isNaN(Number(p)) && p.length <= 2);
+    if (dayStr) day = parseInt(dayStr);
+
+    if (day !== -1 && month !== -1) {
+      return new Date(year, month, day);
     }
     return null;
   };
@@ -260,101 +262,57 @@ const Logistics: React.FC = () => {
     if (!flightSearch) return;
     setIsFlightSearching(true);
 
-    // SIMULATION: Mock Flight Data API
-    // In a real app, this would fetch from an API like AviationStack or Amadeus
-    setTimeout(() => {
-      const code = flightSearch.substring(0, 2).toUpperCase();
-      const number = flightSearch.substring(2);
+    try {
+      // Using the provided API key
+      const apiKey = 'd29d4f62ea3d5de508835ace4db216e3';
+      const url = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flightSearch.toUpperCase()}`;
 
-      let provider = 'Unknown Airline';
-      let origin = 'MAD';
-      let destination = 'LHR';
-      let duration = '2h 30m';
-      let depTime = '10:00';
-      let arrTime = '11:30'; // Time diff included
+      const response = await fetch(url);
+      const data = await response.json();
 
-      // Generate plausible mock data based on airline code
-      switch (code) {
-        case 'IB':
-          provider = 'Iberia';
-          origin = 'MAD (Madrid)';
-          destination = 'MEX (Mexico City)';
-          duration = '12h 05m';
-          depTime = '13:00';
-          arrTime = '18:05';
-          break;
-        case 'BA':
-          provider = 'British Airways';
-          origin = 'LHR (London)';
-          destination = 'JFK (New York)';
-          duration = '8h 15m';
-          depTime = '18:30';
-          arrTime = '21:45';
-          break;
-        case 'AA':
-          provider = 'American Airlines';
-          origin = 'JFK (New York)';
-          destination = 'LAX (Los Angeles)';
-          duration = '6h 30m';
-          depTime = '08:00';
-          arrTime = '11:30';
-          break;
-        case 'AF':
-          provider = 'Air France';
-          origin = 'CDG (Paris)';
-          destination = 'EZE (Buenos Aires)';
-          duration = '13h 45m';
-          depTime = '23:00';
-          arrTime = '08:45';
-          break;
-        case 'EK':
-          provider = 'Emirates';
-          origin = 'DXB (Dubai)';
-          destination = 'LHR (London)';
-          duration = '7h 50m';
-          depTime = '07:45';
-          arrTime = '11:35';
-          break;
-        case 'FR':
-          provider = 'Ryanair';
-          origin = 'STN (London)';
-          destination = 'DUB (Dublin)';
-          duration = '1h 15m';
-          depTime = '06:30';
-          arrTime = '07:45';
-          break;
-        default:
-          provider = 'Airline ' + code;
+      if (data && data.data && data.data.length > 0) {
+        // Find the most relevant flight (usually the first one if it's currently active or scheduled today)
+        const flight = data.data.find((f: any) => f.flight_status === 'active' || f.flight_status === 'scheduled') || data.data[0];
+
+        const formatTime = (dateString: string) => {
+          if (!dateString) return 'TBD';
+          try {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          } catch (e) {
+            return dateString;
+          }
+        };
+
+        const depTime = formatTime(flight.departure.estimated || flight.departure.scheduled);
+        const arrTime = formatTime(flight.arrival.estimated || flight.arrival.scheduled);
+
+        const newItem: TransportItem = {
+          id: Date.now().toString(),
+          eventId: eventId,
+          type: 'flight',
+          provider: flight.airline.name || `Airline ${flightSearch.substring(0, 2).toUpperCase()}`,
+          number: flightSearch.toUpperCase(),
+          origin: `${flight.departure.iata || ''} ${flight.departure.airport || 'Origen'}`,
+          destination: `${flight.arrival.iata || ''} ${flight.arrival.airport || 'Destino'}`,
+          departureTime: depTime,
+          arrivalTime: arrTime,
+          duration: 'Calculando...', // AviationStack free tier doesn't provide easy duration
+          status: flight.flight_status === 'active' ? 'En ruta' : flight.flight_status === 'scheduled' ? 'Scheduled' : flight.flight_status,
+          price: '-'
+        };
+
+        addTransport(newItem);
+        setFlightSearch('');
+      } else {
+        alert('No se encontró el vuelo o no hay información disponible.');
       }
-
-      // Randomize times slightly for "realism" if repeat searching same code
-      if (Math.random() > 0.5) {
-        const hour = Math.floor(Math.random() * 23);
-        const min = Math.floor(Math.random() * 59);
-        depTime = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-        arrTime = `${(hour + 4) % 24}:00`; // Dummy duration logic
-      }
-
-      const newItem: TransportItem = {
-        id: Date.now().toString(),
-        eventId: eventId,
-        type: 'flight',
-        provider: provider,
-        number: flightSearch.toUpperCase(), // User input fully
-        origin: origin,
-        destination: destination,
-        departureTime: depTime,
-        arrivalTime: arrTime,
-        duration: duration,
-        status: 'Scheduled',
-        price: 'Calculating...'
-      };
-
-      addTransport(newItem);
-      setFlightSearch('');
+    } catch (error) {
+      console.error('Error fetching flight data:', error);
+      alert('Hubo un error al buscar el vuelo con AviationStack. Comprueba tu conexión.');
+    } finally {
       setIsFlightSearching(false);
-
-    }, 1500); // Simulate network delay
+    }
   };
 
   // --- AI Handler ---
@@ -363,7 +321,9 @@ const Logistics: React.FC = () => {
     setAiSuggestions([]);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+      if (!apiKey) throw new Error("API Key no configurada");
+      const ai = new GoogleGenAI({ apiKey });
 
       let finalPrompt = "";
       let schema = null;
@@ -1108,7 +1068,9 @@ const Logistics: React.FC = () => {
                                     <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
                                       <Check size={14} className="text-green-500" />
                                       <span className="text-xs font-bold text-green-500">Billete Subido</span>
-                                      <span className="text-[10px] text-gray-400 truncate max-w-[80px]">{passenger.ticketUrl}</span>
+                                      <button onClick={() => alert(`Visualizando billete: ${passenger.ticketUrl}`)} className="text-[10px] text-gray-400 hover:text-white truncate max-w-[80px] underline ml-2">
+                                        Ver Billete
+                                      </button>
                                     </div>
                                   ) : (
                                     <label className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg cursor-pointer transition-colors group">

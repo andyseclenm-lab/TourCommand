@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Calendar as CalendarIcon, CheckCircle, ChevronRight, Search, Globe, Music, LayoutGrid, List, ChevronLeft, Plus, X, Save, Building2, Users, Check, Pencil, Trash2, Mail, Phone, Briefcase } from 'lucide-react';
 import CreatableSelect from '../components/CreatableSelect';
 import EditEventModal from '../components/EditEventModal';
+import ShareTourModal from '../components/ShareTourModal';
 import { useTour } from '../context/TourContext';
 import { Contact, Event, EventType, EventStatus } from '../types';
 
@@ -71,9 +72,12 @@ const TourCities: React.FC = () => {
     const navigate = useNavigate();
     const tourId = state?.tourId;
 
-    const { events, createEvent, updateEvent, deleteEvent, contacts, tourCrew, addTourCrew, updateTourCrew, removeTourCrew, venues } = useTour();
+    const { events, createEvent, updateEvent, deleteEvent, contacts, tourCrew, addTourCrew, updateTourCrew, removeTourCrew, venues, customOptions, addCustomOption } = useTour();
 
     const tourData = events.find(e => e.id === tourId) || (state?.eventData as Event | undefined);
+
+    const cityOptions = Array.from(new Set([...CITIES_OPT, ...(customOptions?.filter(o => o.type === 'city').map(o => o.value) || [])]));
+    const countryOptions = Array.from(new Set([...COUNTRIES_OPT, ...(customOptions?.filter(o => o.type === 'country').map(o => o.value) || [])]));
 
     // Combine hardcoded mock venues with actual database venues
     const availableVenues = Array.from(new Set([
@@ -93,6 +97,9 @@ const TourCities: React.FC = () => {
 
     // Calendar State
     const [currentMonth, setCurrentMonth] = useState(new Date());
+
+    // Share Modal State
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     // City Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -165,6 +172,10 @@ const TourCities: React.FC = () => {
             alert("Por favor selecciona un Venue o marca 'Día Libre'.");
             return;
         }
+
+        // Save new user inputs
+        if (newCity.city && !CITIES_OPT.includes(newCity.city)) addCustomOption('city', newCity.city);
+        if (newCity.country && !COUNTRIES_OPT.includes(newCity.country)) addCustomOption('country', newCity.country);
 
         // Parse date string (YYYY-MM-DD) manually to avoid UTC conversion issues
         const [year, month, day] = newCity.date.split('-').map(Number);
@@ -352,7 +363,7 @@ const TourCities: React.FC = () => {
                                         label="Ciudad"
                                         value={newCity.city}
                                         onChange={(val) => setNewCity({ ...newCity, city: val })}
-                                        options={CITIES_OPT}
+                                        options={cityOptions}
                                         placeholder="Ciudad"
                                         icon={<MapPin size={16} />}
                                         required
@@ -363,7 +374,7 @@ const TourCities: React.FC = () => {
                                         label="País"
                                         value={newCity.country}
                                         onChange={(val) => setNewCity({ ...newCity, country: val })}
-                                        options={COUNTRIES_OPT}
+                                        options={countryOptions}
                                         placeholder="País"
                                         icon={<Globe size={16} />}
                                     />
@@ -608,6 +619,7 @@ const TourCities: React.FC = () => {
                             </button>
                             <div className="h-6 w-px bg-white/10 mx-1"></div>
                             <button onClick={() => { setIsCrewModalOpen(true); setCrewModalView('list'); }} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 py-2.5 rounded-xl font-bold text-sm"><Users size={18} /> <span className="hidden sm:inline">EQUIPO</span></button>
+                            <button onClick={() => setIsShareModalOpen(true)} className="flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"><Mail size={18} /> <span className="hidden sm:inline">COMPARTIR</span></button>
                             <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg"><Plus size={18} /> <span className="hidden sm:inline">Añadir Fecha</span></button>
                             <div className="flex items-center gap-1 bg-surface border border-white/10 p-1 rounded-lg shrink-0">
                                 <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-primary text-white' : 'text-gray-400'}`}><List size={20} /></button>
@@ -686,7 +698,14 @@ const TourCities: React.FC = () => {
                     </div>
                 </div>
             </main>
-        </div >
+            {/* Share Tour Modal */}
+            <ShareTourModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                eventId={tourId || ''}
+                tourName={tourData?.title || 'Gira'}
+            />
+        </div>
     );
 };
 

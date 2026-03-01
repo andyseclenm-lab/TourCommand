@@ -12,8 +12,12 @@ const COUNTRIES = ['España', 'United Kingdom', 'France', 'Germany', 'United Sta
 
 const CreateEvent: React.FC = () => {
   const navigate = useNavigate();
-  const { venues, createEvent } = useTour();
+  const { venues, createEvent, customOptions, addCustomOption } = useTour();
   const [selectedType, setSelectedType] = useState<string>('tour');
+
+  const artistOptions = Array.from(new Set([...ARTISTS, ...(customOptions?.filter(o => o.type === 'artist').map(o => o.value) || [])]));
+  const cityOptions = Array.from(new Set([...CITIES, ...(customOptions?.filter(o => o.type === 'city').map(o => o.value) || [])]));
+  const countryOptions = Array.from(new Set([...COUNTRIES, ...(customOptions?.filter(o => o.type === 'country').map(o => o.value) || [])]));
 
   // Extract venue names for autocomplete
   const venueOptions = venues.map(v => v.name);
@@ -29,52 +33,76 @@ const CreateEvent: React.FC = () => {
     country: '' // Only for Single
   });
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [id]: value
     }));
+    setErrorMsg('');
   };
 
   const handleSelectChange = (field: string, value: string) => {
-    // Auto-fill city/country if venue is selected
+    if (field === 'artistName' && !ARTISTS.includes(value)) addCustomOption('artist', value);
+    if (field === 'city' && !CITIES.includes(value)) addCustomOption('city', value);
+    if (field === 'country' && !COUNTRIES.includes(value)) addCustomOption('country', value);
+
     if (field === 'venue') {
       const selectedVenue = venues.find(v => v.name === value);
       if (selectedVenue) {
-        setFormData(prev => ({
-          ...prev,
-          venue: value,
-          city: selectedVenue.city,
-          country: selectedVenue.country
-        }));
+        setFormData(prev => ({ ...prev, venue: value, city: selectedVenue.city, country: selectedVenue.country }));
         return;
       }
     }
     setFormData(prev => ({ ...prev, [field]: value }));
+    setErrorMsg('');
   };
 
   const handleCreate = async () => {
-    // Create Event Logic
-    const newEventBase = {
-      title: formData.projectName,
-      dateRange: `${formData.startDate} - ${formData.endDate}`,
-      location: selectedType === 'single' ? `${formData.city}, ${formData.country}` : 'Global',
-      type: selectedType === 'tour' ? EventType.TOUR : EventType.CONCERT,
-      status: EventStatus.PLANNING,
-      artist: formData.artistName,
-      image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-      logistics: { travel: 0, hotel: 0, tech: 0 }
-    };
+    setErrorMsg('');
+    if (!formData.projectName || !formData.startDate || !formData.endDate || !formData.artistName) {
+      setErrorMsg('Por favor completa los campos principales (Nombre, Artista, Fechas).');
+      return;
+    }
 
-    const createdEvent = await createEvent(newEventBase);
+    if (selectedType === 'single' && (!formData.city || !formData.country)) {
+      setErrorMsg('Por favor indica la ciudad y el país para el evento único.');
+      return;
+    }
 
-    if (createdEvent) {
-      if (selectedType === 'tour') {
-        navigate('/cities', { state: { tourId: createdEvent.id, eventData: createdEvent } });
+    setIsLoading(true);
+
+    try {
+      const newEventBase = {
+        title: formData.projectName,
+        dateRange: `${formData.startDate} - ${formData.endDate}`,
+        location: selectedType === 'single' ? `${formData.city}, ${formData.country}` : 'Global',
+        type: selectedType === 'tour' ? EventType.TOUR : EventType.CONCERT,
+        status: EventStatus.PLANNING,
+        artist: formData.artistName,
+        image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+        logistics: { travel: 0, hotel: 0, tech: 0 }
+      };
+
+      const createdEvent = await createEvent(newEventBase);
+
+      if (createdEvent) {
+        if (selectedType === 'tour') {
+          navigate('/cities', { state: { tourId: createdEvent.id, eventData: createdEvent } });
+        } else {
+          navigate('/dashboard');
+        }
       } else {
-        navigate('/dashboard');
+        setErrorMsg('No se pudo crear el evento. Revisa la conexión o intenta nuevamente.');
       }
+    } catch (err: any) {
+      console.error("Creation error:", err);
+      setErrorMsg('Ocurrió un error inesperado al crear el evento.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -171,7 +199,7 @@ const CreateEvent: React.FC = () => {
                     label="Nombre del Artista"
                     value={formData.artistName}
                     onChange={(val) => handleSelectChange('artistName', val)}
-                    options={ARTISTS}
+                    options={artistOptions}
                     placeholder="ej: The Weeknd"
                     icon={<User className="h-5 w-5" />}
                   />
@@ -194,7 +222,7 @@ const CreateEvent: React.FC = () => {
                           label="Ciudad"
                           value={formData.city}
                           onChange={(val) => handleSelectChange('city', val)}
-                          options={CITIES}
+                          options={cityOptions}
                           placeholder="ej: Madrid"
                           icon={<MapPin className="h-5 w-5" />}
                         />
@@ -204,7 +232,7 @@ const CreateEvent: React.FC = () => {
                           label="País"
                           value={formData.country}
                           onChange={(val) => handleSelectChange('country', val)}
-                          options={COUNTRIES}
+                          options={countryOptions}
                           placeholder="ej: España"
                           icon={<Globe className="h-5 w-5" />}
                         />
@@ -257,12 +285,25 @@ const CreateEvent: React.FC = () => {
             </div>
           </div>
 
-          <div className="mt-8 flex justify-end pt-4 border-t border-white/5">
+          <div className="mt-8 flex flex-col items-end pt-4 border-t border-white/5 space-y-4">
+            {errorMsg && (
+              <div className="w-full md:w-auto px-4 py-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-500 text-sm font-medium animate-in slide-in-from-bottom-2">
+                {errorMsg}
+              </div>
+            )}
             <button
               onClick={handleCreate}
-              className="w-full md:w-auto rounded-xl bg-primary px-8 py-4 text-center text-sm font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-600 focus:outline-none transition-all active:scale-[0.98] hover:-translate-y-0.5 uppercase tracking-wide flex items-center justify-center gap-2"
+              disabled={isLoading}
+              className="w-full md:w-auto rounded-xl bg-primary px-8 py-4 text-center text-sm font-bold text-white shadow-lg shadow-blue-900/20 hover:bg-blue-600 focus:outline-none transition-all active:scale-[0.98] hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 uppercase tracking-wide flex items-center justify-center gap-2"
             >
-              FINALIZAR Y CREAR
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  CREANDO...
+                </>
+              ) : (
+                'FINALIZAR Y CREAR'
+              )}
             </button>
           </div>
         </div>

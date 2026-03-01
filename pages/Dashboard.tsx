@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTour } from '../context/TourContext';
+import { useAuth } from '../context/AuthContext';
 import { Event } from '../types';
 
 import DashboardCalendarList from '../components/DashboardCalendarList';
@@ -14,6 +15,7 @@ import DashboardFeed from '../components/DashboardFeed';
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { events } = useTour();
+  const { user } = useAuth();
 
   // Logic to find nearest active event
   const nearestEvent = useMemo(() => {
@@ -23,11 +25,11 @@ const Dashboard: React.FC = () => {
   }, [events]);
 
   const handleEventClick = (event: Event) => {
-    navigate('/venue', {
-      state: {
-        eventData: event
-      }
-    });
+    if (event.type === 'Tour') {
+      navigate('/cities', { state: { tourId: event.id, eventData: event } });
+    } else {
+      navigate('/venue', { state: { eventData: event } });
+    }
   };
 
   return (
@@ -38,7 +40,7 @@ const Dashboard: React.FC = () => {
           <div className="flex items-center gap-3 md:hidden">
             <div className="relative">
               <img
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80"
+                src={user?.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80"}
                 alt="User"
                 className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/50"
               />
@@ -46,7 +48,9 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span className="text-xs font-medium text-muted">Buenas noches,</span>
-              <h2 className="text-sm font-bold leading-tight text-text">Alex Morgan</h2>
+              <h2 className="text-sm font-bold leading-tight text-text">
+                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuario'}
+              </h2>
             </div>
           </div>
 
@@ -94,7 +98,7 @@ const Dashboard: React.FC = () => {
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
                 <MapPin className="text-primary" size={20} /> Evento Más Cercano
               </h2>
-              <button onClick={() => navigate('/venues')} className="text-xs text-muted hover:text-text transition-colors">
+              <button onClick={() => navigate('/events')} className="text-xs text-muted hover:text-text transition-colors">
                 Ver calendario completo
               </button>
             </div>
@@ -156,9 +160,11 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Action Button */}
                     <div className="flex items-end">
-                      <button className="w-full py-2 bg-primary hover:bg-blue-600 text-text font-bold rounded-xl transition-colors text-xs flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleEventClick(nearestEvent)}
+                        className="w-full py-2 bg-primary hover:bg-blue-600 text-text font-bold rounded-xl transition-colors text-xs flex items-center justify-center gap-2"
+                      >
                         Gestionar Evento <ArrowRight size={14} />
                       </button>
                     </div>
