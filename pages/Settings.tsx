@@ -12,7 +12,7 @@ const Settings: React.FC = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences' | 'billing' | 'appearance'>('profile');
 
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
     const { themeMode, setThemeMode, customColors, updateCustomColor } = useTheme();
 
     // Real Data States
@@ -215,7 +215,11 @@ const Settings: React.FC = () => {
 
                         <div className="lg:mt-auto pt-4 border-t border-border hidden lg:block">
                             <button
-                                onClick={() => navigate('/')}
+                                onClick={async () => {
+                                    /* Fixed logout missing signout bug */
+                                    await signOut();
+                                    navigate('/login');
+                                }}
                                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-red-400 hover:bg-red-500/10 w-full transition-colors"
                             >
                                 <LogOut size={18} />
