@@ -31,11 +31,16 @@ const Logistics: React.FC = () => {
     addTourCrew, removeTourCrew,
     addNote, updateNote, deleteNote, addNoteReply,
     createEvent, updateEvent, deleteEvent,
-    documents, addDocument, updateDocument, deleteDocument
+    documents, addDocument, updateDocument, deleteDocument,
+    getUserRole
   } = useTour();
   const eventData: Event | undefined = location.state?.eventData;
   const tourData = location.state?.tourData;
   const eventId = eventData?.id;
+
+  const userRole = getUserRole(eventId || '');
+  const canEdit = userRole === 'admin' || userRole === 'editor';
+  const canDelete = userRole === 'admin';
 
   // Helper to parser date string (Deduplicated logic - ideally move to utils)
   const parseDateString = (dateStr: string) => {
@@ -764,17 +769,19 @@ const Logistics: React.FC = () => {
                   <PlaneTakeoff size={20} className="text-primary" />
                   Transporte
                 </h3>
-                <button
-                  onClick={() => {
-                    setModalType('transport');
-                    setEditingTransportId(null);
-                    setManualTransport({ origin: '', destination: '', provider: '', number: '', departureTime: '', arrivalTime: '', type: 'flight' });
-                    setIsModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 text-xs font-bold bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
-                >
-                  <Plus size={14} /> Añadir Manual
-                </button>
+                {canEdit && (
+                  <button
+                    onClick={() => {
+                      setModalType('transport');
+                      setEditingTransportId(null);
+                      setManualTransport({ origin: '', destination: '', provider: '', number: '', departureTime: '', arrivalTime: '', type: 'flight' });
+                      setIsModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-bold bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
+                  >
+                    <Plus size={14} /> Añadir Manual
+                  </button>
+                )}
               </div>
 
               {/* Flight Search By Number */}
@@ -804,13 +811,15 @@ const Logistics: React.FC = () => {
                           onKeyDown={(e) => e.key === 'Enter' && handleFlightLookup()}
                         />
                       </div>
-                      <button
-                        onClick={handleFlightLookup}
-                        disabled={!flightSearch || isFlightSearching}
-                        className="bg-primary hover:bg-blue-600 text-white font-bold px-6 py-2 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20 flex items-center gap-2"
-                      >
-                        {isFlightSearching ? <span className="animate-spin">⌛</span> : 'Buscar'}
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={handleFlightLookup}
+                          disabled={!flightSearch || isFlightSearching}
+                          className="bg-primary hover:bg-blue-600 text-white font-bold px-6 py-2 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-900/20 flex items-center gap-2"
+                        >
+                          {isFlightSearching ? <span className="animate-spin">⌛</span> : 'Buscar'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -837,13 +846,15 @@ const Logistics: React.FC = () => {
                       className="flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder-gray-600"
                       onKeyDown={(e) => e.key === 'Enter' && handleAiSearch('transport')}
                     />
-                    <button
-                      onClick={() => handleAiSearch('transport')}
-                      disabled={isAiLoading === 'transport'}
-                      className="bg-primary hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {isAiLoading === 'transport' ? <span className="animate-spin">⌛</span> : <><Sparkles size={14} /> Buscar con IA</>}
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => handleAiSearch('transport')}
+                        disabled={isAiLoading === 'transport'}
+                        className="bg-primary hover:bg-blue-600 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 transition-all disabled:opacity-50"
+                      >
+                        {isAiLoading === 'transport' ? <span className="animate-spin">⌛</span> : <><Sparkles size={14} /> Buscar con IA</>}
+                      </button>
+                    )}
                   </div>
 
                   {/* AI Suggestions Results */}
@@ -926,7 +937,7 @@ const Logistics: React.FC = () => {
                           <>Ver Detalles <ChevronDown size={16} /></>
                         )}
                       </button>
-                      <button
+                      {canEdit && <button
                         onClick={() => {
                           const today = new Date().toISOString().split('T')[0];
                           setManualTransport({
@@ -942,11 +953,11 @@ const Logistics: React.FC = () => {
                         className="w-11 h-11 flex items-center justify-center rounded-xl bg-[#232348] text-secondary hover:text-white hover:bg-white/10 transition-colors border border-white/5"
                       >
                         <Pencil size={20} />
-                      </button>
+                      </button>}
                       <button className="w-11 h-11 flex items-center justify-center rounded-xl bg-[#232348] text-secondary hover:text-white hover:bg-white/10 transition-colors border border-white/5">
                         <Share2 size={20} />
                       </button>
-                      <button
+                      {canDelete && <button
                         onClick={() => {
                           if (confirm('¿Eliminar este transporte?')) {
                             deleteTransport(item.id);
@@ -955,7 +966,7 @@ const Logistics: React.FC = () => {
                         className="w-11 h-11 flex items-center justify-center rounded-xl bg-[#232348] text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors border border-white/5"
                       >
                         <Trash2 size={20} />
-                      </button>
+                      </button>}
                     </div>
                   </div>
 
@@ -1041,7 +1052,7 @@ const Logistics: React.FC = () => {
                                 </div>
 
                                 <div className="flex items-center gap-2 mr-4">
-                                  <button
+                                  {canEdit && <button
                                     onClick={() => {
                                       setAddingPassengerTo(item.id);
                                       setEditingPassengerId(passenger.id);
@@ -1054,13 +1065,13 @@ const Logistics: React.FC = () => {
                                     className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
                                   >
                                     <Pencil size={14} />
-                                  </button>
-                                  <button
+                                  </button>}
+                                  {canDelete && <button
                                     onClick={() => handleDeletePassenger(item.id, passenger.id)}
                                     className="p-1.5 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
                                   >
                                     <Trash2 size={14} />
-                                  </button>
+                                  </button>}
                                 </div>
 
                                 <div className="flex items-center gap-3 self-end sm:self-auto">
@@ -1146,14 +1157,14 @@ const Logistics: React.FC = () => {
                                 </button>
                               </div>
                             </div>
-                          ) : (
+                          ) : canEdit ? (
                             <button
                               onClick={() => setAddingPassengerTo(item.id)}
                               className="mt-4 w-full py-3 border border-dashed border-white/10 rounded-xl text-gray-400 text-xs font-bold hover:text-white hover:bg-white/5 hover:border-white/20 transition-all flex items-center justify-center gap-2"
                             >
                               <Plus size={16} /> Añadir Viajero
                             </button>
-                          )}
+                          ) : null}
                         </div>
 
                       </div>
@@ -1172,39 +1183,41 @@ const Logistics: React.FC = () => {
                   <BedDouble size={20} className="text-primary" />
                   Alojamiento
                 </h3>
-                <button
-                  onClick={() => {
-                    setModalType('lodging');
-                    setEditingLodgingId(null);
+                {canEdit && (
+                  <button
+                    onClick={() => {
+                      setModalType('lodging');
+                      setEditingLodgingId(null);
 
-                    // Pre-fill dates based on Event Date
-                    let defaultCheckIn = '';
-                    let defaultCheckOut = '';
-                    if (eventData?.dateRange) {
-                      const dateObj = parseDateString(eventData.dateRange);
-                      if (dateObj && dateObj.getFullYear() > 2000) { // Valid date check
-                        // Set Check-In (Event Date)
-                        const dIn = dateObj;
-                        defaultCheckIn = dIn.toISOString().split('T')[0];
+                      // Pre-fill dates based on Event Date
+                      let defaultCheckIn = '';
+                      let defaultCheckOut = '';
+                      if (eventData?.dateRange) {
+                        const dateObj = parseDateString(eventData.dateRange);
+                        if (dateObj && dateObj.getFullYear() > 2000) { // Valid date check
+                          // Set Check-In (Event Date)
+                          const dIn = dateObj;
+                          defaultCheckIn = dIn.toISOString().split('T')[0];
 
-                        // Set Check-Out (Event Date + 1 Day)
-                        const dOut = new Date(dIn);
-                        dOut.setDate(dOut.getDate() + 1);
-                        defaultCheckOut = dOut.toISOString().split('T')[0];
+                          // Set Check-Out (Event Date + 1 Day)
+                          const dOut = new Date(dIn);
+                          dOut.setDate(dOut.getDate() + 1);
+                          defaultCheckOut = dOut.toISOString().split('T')[0];
+                        }
                       }
-                    }
 
-                    setManualLodging({
-                      name: '', address: '', rooms: 0,
-                      checkIn: '15:00', checkOut: '11:00',
-                      checkInDate: defaultCheckIn, checkOutDate: defaultCheckOut
-                    });
-                    setIsModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 text-xs font-bold bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
-                >
-                  <Plus size={14} /> Añadir Manual
-                </button>
+                      setManualLodging({
+                        name: '', address: '', rooms: 0,
+                        checkIn: '15:00', checkOut: '11:00',
+                        checkInDate: defaultCheckIn, checkOutDate: defaultCheckOut
+                      });
+                      setIsModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-bold bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
+                  >
+                    <Plus size={14} /> Añadir Manual
+                  </button>
+                )}
               </div>
 
               {/* AI Natural Language Search - Lodging */}
@@ -1228,13 +1241,15 @@ const Logistics: React.FC = () => {
                       className="flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder-gray-600"
                       onKeyDown={(e) => e.key === 'Enter' && handleAiSearch('lodging')}
                     />
-                    <button
-                      onClick={() => handleAiSearch('lodging')}
-                      disabled={isAiLoading === 'lodging'}
-                      className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {isAiLoading === 'lodging' ? <span className="animate-spin">⌛</span> : <><Sparkles size={14} /> Buscar</>}
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => handleAiSearch('lodging')}
+                        disabled={isAiLoading === 'lodging'}
+                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 transition-all disabled:opacity-50"
+                      >
+                        {isAiLoading === 'lodging' ? <span className="animate-spin">⌛</span> : <><Sparkles size={14} /> Buscar</>}
+                      </button>
+                    )}
                   </div>
 
                   {/* AI Suggestions Results */}
@@ -1303,27 +1318,31 @@ const Logistics: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setManualLodging(item);
-                          setEditingLodgingId(item.id);
-                          setModalType('lodging');
-                          setIsModalOpen(true);
-                        }}
-                        className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-                      >
-                        <Pencil size={20} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm('¿Eliminar este alojamiento?')) {
-                            deleteLodging(item.id);
-                          }
-                        }}
-                        className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-white/10 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                      >
-                        <Trash2 size={20} />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => {
+                            setManualLodging(item);
+                            setEditingLodgingId(item.id);
+                            setModalType('lodging');
+                            setIsModalOpen(true);
+                          }}
+                          className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                        >
+                          <Pencil size={20} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => {
+                            if (confirm('¿Eliminar este alojamiento?')) {
+                              deleteLodging(item.id);
+                            }
+                          }}
+                          className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-surface border border-white/10 text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      )}
                       <button className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20">
                         <Navigation size={20} />
                       </button>
@@ -1367,12 +1386,14 @@ const Logistics: React.FC = () => {
                         <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                           <Key size={16} /> Rooming List ({roomingList.length} Habs)
                         </h4>
-                        <button
-                          onClick={() => handleOpenRoomingModal()}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors border border-primary/20"
-                        >
-                          <Plus size={14} /> Añadir Huésped
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => handleOpenRoomingModal()}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors border border-primary/20"
+                          >
+                            <Plus size={14} /> Añadir Huésped
+                          </button>
+                        )}
                       </div>
 
                       <div className="overflow-x-auto rounded-xl border border-white/5">
@@ -1402,18 +1423,22 @@ const Logistics: React.FC = () => {
                                 </td>
                                 <td className="p-3 text-right">
                                   <div className="flex justify-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                      onClick={() => handleOpenRoomingModal(room)}
-                                      className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-                                    >
-                                      <Pencil size={14} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteRoomingEntry(room.id)}
-                                      className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
+                                    {canEdit && (
+                                      <button
+                                        onClick={() => handleOpenRoomingModal(room)}
+                                        className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                      >
+                                        <Pencil size={14} />
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button
+                                        onClick={() => handleDeleteRoomingEntry(room.id)}
+                                        className="p-1.5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
                                   </div>
                                 </td>
                               </tr>

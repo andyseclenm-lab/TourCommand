@@ -45,6 +45,11 @@ interface TourContextType {
   removeEventCrew: (contactId: string, eventId: string) => Promise<void>;
   customOptions: { type: string, value: string }[];
   addCustomOption: (type: string, value: string) => Promise<void>;
+  getUserRole: (eventId: string, parentId?: string) => 'admin' | 'editor' | 'viewer' | null;
+  eventMembers: any[];
+  fetchEventMembers: (eventId: string) => Promise<void>;
+  updateMemberRole: (eventId: string, targetUserId: string, newRole: string) => Promise<void>;
+  removeMember: (eventId: string, targetUserId: string) => Promise<void>;
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
@@ -59,6 +64,8 @@ export const TourProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [events, setEvents] = useState<Event[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [customOptions, setCustomOptions] = useState<{ type: string, value: string }[]>([]);
+  const [userMemberships, setUserMemberships] = useState<{ event_id: string, role: string }[]>([]);
+  const [eventMembers, setEventMembers] = useState<any[]>([]);
 
   // Local state for tour crew (subset of contacts)
   const [tourCrew, setTourCrew] = useState<Contact[]>([]);
@@ -75,7 +82,14 @@ export const TourProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setEvents(eventsData.map((e: any) => ({
           ...e,
           dateRange: e.date_range,
+          user_id: e.user_id
         })));
+      }
+
+      // 1b. User Memberships
+      const { data: membershipData } = await supabase.from('event_members').select('event_id, role').eq('user_id', session.user.id);
+      if (membershipData) {
+        setUserMemberships(membershipData);
       }
 
       // 2. Venues
@@ -214,6 +228,29 @@ export const TourProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           });
         } else if (payload.eventType === 'DELETE') {
           setNotes(prev => prev.filter(e => e.id !== payload.old.id));
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_members' }, payload => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          const m = payload.new as any;
+          // Optimistically update our memberships if the change is about us
+          if (m.user_id === session.user.id) {
+            setUserMemberships(prev => {
+              const exists = prev.find(p => p.event_id === m.event_id);
+              return exists ? prev.map(p => p.event_id === m.event_id ? m : p) : [...prev, m];
+            });
+          }
+          // Also update eventMembers list directly
+          setEventMembers(prev => {
+            const exists = prev.find(p => p.id === m.id);
+            return exists ? prev.map(p => p.id === m.id ? m : p) : [...prev, m];
+          });
+        } else if (payload.eventType === 'DELETE') {
+          const m = payload.old as any;
+          if (m.user_id === session.user.id) {
+            setUserMemberships(prev => prev.filter(p => p.event_id !== m.event_id));
+          }
+          setEventMembers(prev => prev.filter(p => p.id !== m.id));
         }
       })
       .subscribe();
@@ -751,6 +788,31 @@ export const TourProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const getUserRole = (eventId: string, parentId?: string): 'admin' | 'editor' | 'viewer' | null => {
+    if (!session?.user) return null;
+
+    // Check if creator (admin)
+    const eventObj = events.find(e => e.id === eventId);
+    if (eventObj && eventObj.user_id === session.user.id) return 'admin';
+
+    if (parentId) {
+      const parentObj = events.find(e => e.id === parentId);
+      if (parentObj && parentObj.user_id === session.user.id) return 'admin';
+    }
+
+    // Check direct membership
+    const directMembership = userMemberships.find(m => m.event_id === eventId);
+    if (directMembership) return directMembership.role as 'admin' | 'editor' | 'viewer';
+
+    // Check parent membership
+    if (parentId) {
+      const parentMembership = userMemberships.find(m => m.event_id === parentId);
+      if (parentMembership) return parentMembership.role as 'admin' | 'editor' | 'viewer';
+    }
+
+    return 'viewer';
+  };
+
   const addDocument = (doc: DocumentItem) => {
     setDocuments(prev => [...prev, doc]);
   };
@@ -764,73 +826,100 @@ export const TourProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const addNoteReply = async (noteId: string, reply: NoteReply) => {
-    // First get existing replies
-    const note = notes.find(n => n.id === noteId);
-    if (!note) return;
+    // Stub
+  };
 
-    const newReplies = [...(note.replies || []), reply];
+  // --- Member Management ---
 
-    const { error } = await supabase.from('notes').update({ replies: newReplies }).eq('id', noteId);
-
-    if (!error) {
-      setNotes(prev => prev.map(n => {
-        if (n.id === noteId) {
-          return { ...n, replies: newReplies };
-        }
-        return n;
-      }));
+  const fetchEventMembers = async (eventId: string) => {
+    const { data, error } = await supabase.from('event_members').select('*').eq('event_id', eventId);
+    if (!error && data) {
+      setEventMembers(data);
+    } else {
+      console.error("Error fetching members:", error);
     }
   };
 
+  const updateMemberRole = async (eventId: string, targetUserId: string, newRole: string) => {
+    const { error } = await supabase.rpc('update_user_role', {
+      p_event_id: eventId,
+      p_target_user_id: targetUserId,
+      p_new_role: newRole
+    });
+    if (error) {
+      console.error("Error updating member role:", error);
+      throw error;
+    }
+  };
+
+  const removeMember = async (eventId: string, targetUserId: string) => {
+    const { error } = await supabase.rpc('remove_user_from_event', {
+      p_event_id: eventId,
+      p_target_user_id: targetUserId
+    });
+    if (error) {
+      console.error("Error removing member:", error);
+      throw error;
+    }
+  };
 
   return (
-    <TourContext.Provider value={{
-      transportList,
-      lodgingList,
-      manualSchedule,
-      contacts,
-      venues,
-      tourCrew,
-      notes,
-      events,
-      createEvent,
-      updateEvent,
-      deleteEvent,
-      addTransport,
-      updateTransport,
-      addLodging,
-      addScheduleItem,
-      updateScheduleItem,
-      deleteScheduleItem,
-      addContact,
-      updateContact,
-      deleteContact,
-      addVenue,
-      updateVenue,
-      deleteVenue,
-      addTourCrew,
-      updateTourCrew,
-      removeTourCrew,
-      deleteTransport,
-      updateLodging,
-      deleteLodging,
-      addNote,
-      updateNote,
-      deleteNote,
-      addNoteReply,
-      documents,
-      addDocument,
-      updateDocument,
-      deleteDocument,
-      addEventCrew,
-      removeEventCrew,
-      customOptions,
-      addCustomOption
-    }}>
+    <TourContext.Provider
+      value={{
+        transportList,
+        lodgingList,
+        manualSchedule,
+        contacts,
+        venues,
+        tourCrew,
+        notes,
+        events,
+        documents,
+        addDocument,
+        updateDocument,
+        deleteDocument,
+        createEvent,
+        updateEvent,
+        deleteEvent,
+        addTransport,
+        updateTransport,
+        deleteTransport,
+        addLodging,
+        updateLodging,
+        deleteLodging,
+        addScheduleItem,
+        updateScheduleItem,
+        deleteScheduleItem,
+        addContact,
+        updateContact,
+        deleteContact,
+        addVenue,
+        updateVenue,
+        deleteVenue,
+        addTourCrew,
+        updateTourCrew,
+        removeTourCrew,
+        addNote,
+        updateNote,
+        deleteNote,
+        addNoteReply,
+        addEventCrew,
+        removeEventCrew,
+        customOptions,
+        addCustomOption,
+        getUserRole,
+        eventMembers,
+        fetchEventMembers,
+        updateMemberRole,
+        removeMember
+      }}
+    >
       {children}
     </TourContext.Provider>
   );
 };
+
+
 
 export const useTour = () => {
   const context = useContext(TourContext);

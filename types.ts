@@ -35,6 +35,7 @@ export interface Event {
   };
   readiness?: number;
   parent_id?: string;
+  user_id?: string;
 }
 
 export interface TimelineItem {

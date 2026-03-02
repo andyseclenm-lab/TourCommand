@@ -55,7 +55,7 @@ const parseEventDate = (dateStr: string) => {
 const VenueDetails: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { manualSchedule, transportList, lodgingList, addScheduleItem, deleteScheduleItem, updateScheduleItem, contacts: globalContacts, updateContact, venues, tourCrew, deleteEvent, updateEvent, documents: globalDocuments, addDocument, updateDocument, deleteDocument, events, addEventCrew, removeEventCrew } = useTour();
+  const { manualSchedule, transportList, lodgingList, addScheduleItem, deleteScheduleItem, updateScheduleItem, contacts: globalContacts, updateContact, venues, tourCrew, deleteEvent, updateEvent, documents: globalDocuments, addDocument, updateDocument, deleteDocument, events, addEventCrew, removeEventCrew, getUserRole } = useTour();
 
   // Incoming data from Dashboard or City Selection (ID source)
   const incomingEventData = location.state?.eventData;
@@ -63,6 +63,10 @@ const VenueDetails: React.FC = () => {
 
   // Reactively retrieve the event from Context to ensure we have the latest data
   const liveEvent = useMemo(() => events.find(e => e.id === eventId) || incomingEventData, [events, eventId, incomingEventData]);
+
+  const userRole = getUserRole(eventId || '', liveEvent?.parent_id);
+  const canEdit = userRole === 'admin' || userRole === 'editor';
+  const canDelete = userRole === 'admin';
 
   // Filter lists by Event ID
   const filteredTransport = useMemo(() => transportList.filter(t => t.eventId === eventId), [transportList, eventId]);
@@ -984,27 +988,31 @@ const VenueDetails: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (confirm('¿Eliminar este evento?')) {
-                  if (liveEvent?.id) {
-                    deleteEvent(liveEvent.id);
-                    navigate(-1);
+            {canDelete && (
+              <button
+                onClick={() => {
+                  if (confirm('¿Eliminar este evento?')) {
+                    if (liveEvent?.id) {
+                      deleteEvent(liveEvent.id);
+                      navigate(-1);
+                    }
                   }
-                }
-              }}
-              className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
-              title="Eliminar Evento"
-            >
-              <Trash2 size={20} />
-            </button>
-            <button
-              onClick={() => setIsEditEventModalOpen(true)}
-              className="p-2 text-muted hover:text-text hover:hover:bg-primary/10 rounded-lg transition-colors border border-transparent hover:border-border"
-              title="Modificar Evento"
-            >
-              <Pencil size={20} />
-            </button>
+                }}
+                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
+                title="Eliminar Evento"
+              >
+                <Trash2 size={20} />
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={() => setIsEditEventModalOpen(true)}
+                className="p-2 text-muted hover:text-text hover:hover:bg-primary/10 rounded-lg transition-colors border border-transparent hover:border-border"
+                title="Modificar Evento"
+              >
+                <Pencil size={20} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1061,32 +1069,38 @@ const VenueDetails: React.FC = () => {
 
           {/* Banner Actions */}
           <div className="absolute top-4 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={() => setIsShareModalOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-primary/80 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-primary transition-colors border border-primary/50"
-            >
-              <Users size={14} /> Compartir
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleImageFileChange}
-              accept="image/*"
-              className="hidden"
-            />
-            <button
-              onClick={handleImageUploadClick}
-              disabled={isUploadingImage}
-              className="flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-black/80 transition-colors border border-border disabled:opacity-50"
-            >
-              <Camera size={14} /> {isUploadingImage ? 'Subiendo...' : 'Modificar'}
-            </button>
-            <button
-              onClick={handleDeleteImage}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-500/80 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-red-600 transition-colors border border-red-500/20"
-            >
-              <Trash2 size={14} />
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => setIsShareModalOpen(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary/80 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-primary transition-colors border border-primary/50"
+              >
+                <Users size={14} /> Compartir
+              </button>
+            )}
+            {canEdit && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageFileChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <button
+                  onClick={handleImageUploadClick}
+                  disabled={isUploadingImage}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-black/80 transition-colors border border-border disabled:opacity-50"
+                >
+                  <Camera size={14} /> {isUploadingImage ? 'Subiendo...' : 'Modificar'}
+                </button>
+                <button
+                  onClick={handleDeleteImage}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-red-500/80 backdrop-blur-md rounded-lg text-xs font-bold hover:bg-red-600 transition-colors border border-red-500/20"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </>
+            )}
           </div>
 
           {/* Banner Text */}
@@ -1111,12 +1125,14 @@ const VenueDetails: React.FC = () => {
                   <h3 className="text-lg font-bold text-text flex items-center gap-2">
                     <Info size={18} className="text-primary" /> Datos del Proyecto
                   </h3>
-                  <button
-                    onClick={openProjectModal}
-                    className="p-2 hover:hover:bg-primary/10 rounded-lg text-muted hover:text-text transition-colors"
-                  >
-                    <Pencil size={16} />
-                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={openProjectModal}
+                      className="p-2 hover:hover:bg-primary/10 rounded-lg text-muted hover:text-text transition-colors"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-4">
                   <div className="flex items-start gap-4 p-3 rounded-xl bg-primary/5 border border-border">
@@ -1296,9 +1312,11 @@ const VenueDetails: React.FC = () => {
                   <h3 className="text-lg font-bold text-text flex items-center gap-2">
                     <FileText size={18} className="text-primary" /> Documentación
                   </h3>
-                  <button onClick={() => openDocModal()} className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold rounded-lg transition-colors border border-primary/20">
-                    <Plus size={16} /> Añadir
-                  </button>
+                  {canEdit && (
+                    <button onClick={() => openDocModal()} className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold rounded-lg transition-colors border border-primary/20">
+                      <Plus size={16} /> Añadir
+                    </button>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {documents.map((doc) => (
@@ -1308,8 +1326,8 @@ const VenueDetails: React.FC = () => {
                           {getDocIcon(doc.type)}
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openDocModal(doc)} className="p-1.5 hover:hover:bg-primary/10 rounded-lg text-muted hover:text-text"><Pencil size={14} /></button>
-                          <button onClick={() => deleteDoc(doc.id)} className="p-1.5 hover:hover:bg-primary/10 rounded-lg text-muted hover:text-red-400"><Trash2 size={14} /></button>
+                          {canEdit && <button onClick={() => openDocModal(doc)} className="p-1.5 hover:hover:bg-primary/10 rounded-lg text-muted hover:text-text"><Pencil size={14} /></button>}
+                          {canDelete && <button onClick={() => deleteDoc(doc.id)} className="p-1.5 hover:hover:bg-primary/10 rounded-lg text-muted hover:text-red-400"><Trash2 size={14} /></button>}
                         </div>
                       </div>
                       <h4 className="font-bold text-text mb-1 truncate">{doc.name}</h4>
@@ -1332,9 +1350,11 @@ const VenueDetails: React.FC = () => {
                   <h3 className="text-lg font-bold text-text flex items-center gap-2">
                     <Clock size={18} className="text-primary" /> Agenda del Día
                   </h3>
-                  <button onClick={() => openScheduleModal()} className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold rounded-lg transition-colors border border-primary/20">
-                    <Plus size={16} /> Añadir Evento
-                  </button>
+                  {canEdit && (
+                    <button onClick={() => openScheduleModal()} className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-bold rounded-lg transition-colors border border-primary/20">
+                      <Plus size={16} /> Añadir Evento
+                    </button>
+                  )}
                 </div>
 
                 <div className="relative border-l-2 border-border ml-3 md:ml-6 space-y-8 pl-6 md:pl-8 py-2">
@@ -1426,12 +1446,14 @@ const VenueDetails: React.FC = () => {
                                       })
                                     ) : null}
 
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); openScheduleModal(item); }}
-                                      className="w-8 h-8 rounded-full border-2 border-background bg-primary/5 flex items-center justify-center text-xs font-bold text-muted hover:hover:bg-primary/10 hover:text-text transition-colors"
-                                    >
-                                      <Plus size={14} />
-                                    </button>
+                                    {canEdit && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); openScheduleModal(item); }}
+                                        className="w-8 h-8 rounded-full border-2 border-background bg-primary/5 flex items-center justify-center text-xs font-bold text-muted hover:hover:bg-primary/10 hover:text-text transition-colors"
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                    )}
                                   </div>
 
                                   {/* Render Transport Passengers (List View) - Now outside avatar row */}
@@ -1457,20 +1479,24 @@ const VenueDetails: React.FC = () => {
                                 </div>
 
                                 <div className="flex gap-2 justify-end mt-auto pt-2">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openScheduleModal(item); }}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border border-border hover:hover:bg-primary/10 flex items-center gap-1 transition-colors ${item.isAutoGenerated ? 'opacity-50 cursor-not-allowed' : 'text-gray-300 hover:text-text'}`}
-                                    disabled={item.isAutoGenerated}
-                                  >
-                                    <Pencil size={14} /> Editar
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteScheduleItem(item.id); }}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border border-border hover:bg-red-500/10 hover:border-red-500/20 text-gray-300 hover:text-red-400 flex items-center gap-1 transition-colors ${item.isAutoGenerated ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={item.isAutoGenerated}
-                                  >
-                                    <Trash2 size={14} /> Eliminar
-                                  </button>
+                                  {canEdit && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openScheduleModal(item); }}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border border-border hover:hover:bg-primary/10 flex items-center gap-1 transition-colors ${item.isAutoGenerated ? 'opacity-50 cursor-not-allowed' : 'text-gray-300 hover:text-text'}`}
+                                      disabled={item.isAutoGenerated}
+                                    >
+                                      <Pencil size={14} /> Editar
+                                    </button>
+                                  )}
+                                  {canDelete && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteScheduleItem(item.id); }}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border border-border hover:bg-red-500/10 hover:border-red-500/20 text-gray-300 hover:text-red-400 flex items-center gap-1 transition-colors ${item.isAutoGenerated ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                      disabled={item.isAutoGenerated}
+                                    >
+                                      <Trash2 size={14} /> Eliminar
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1500,12 +1526,14 @@ const VenueDetails: React.FC = () => {
                       <button className="flex items-center gap-2 px-3 py-2 bg-primary/5 hover:hover:bg-primary/10 text-text text-sm font-bold rounded-lg transition-colors border border-border">
                         <ClipboardList size={16} /> Call Sheet
                       </button>
-                      <button
-                        onClick={() => setIsContactSearchOpen(true)}
-                        className="flex items-center gap-2 px-3 py-2 bg-primary hover:bg-blue-600 text-text text-sm font-bold rounded-lg transition-colors shadow-lg shadow-blue-900/20"
-                      >
-                        <Plus size={16} /> Añadir Miembro
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => setIsContactSearchOpen(true)}
+                          className="flex items-center gap-2 px-3 py-2 bg-primary hover:bg-blue-600 text-text text-sm font-bold rounded-lg transition-colors shadow-lg shadow-blue-900/20"
+                        >
+                          <Plus size={16} /> Añadir Miembro
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1564,12 +1592,16 @@ const VenueDetails: React.FC = () => {
                                     </div>
                                   </div>
                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => openEditContactModal(contact)} className="text-muted hover:text-text p-1.5 rounded-lg hover:hover:bg-primary/10 transition-colors">
-                                      <Pencil size={14} />
-                                    </button>
-                                    <button onClick={() => handleRemoveEventCrew(contact.id)} className="text-muted hover:text-red-400 p-1.5 rounded-lg hover:hover:bg-primary/10 transition-colors">
-                                      <Trash2 size={14} />
-                                    </button>
+                                    {canEdit && (
+                                      <button onClick={() => openEditContactModal(contact)} className="text-muted hover:text-text p-1.5 rounded-lg hover:hover:bg-primary/10 transition-colors">
+                                        <Pencil size={14} />
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button onClick={() => handleRemoveEventCrew(contact.id)} className="text-muted hover:text-red-400 p-1.5 rounded-lg hover:hover:bg-primary/10 transition-colors">
+                                        <Trash2 size={14} />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 

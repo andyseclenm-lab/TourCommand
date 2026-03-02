@@ -72,9 +72,14 @@ const TourCities: React.FC = () => {
     const navigate = useNavigate();
     const tourId = state?.tourId;
 
-    const { events, createEvent, updateEvent, deleteEvent, contacts, tourCrew, addTourCrew, updateTourCrew, removeTourCrew, venues, customOptions, addCustomOption } = useTour();
+    const { events, createEvent, updateEvent, deleteEvent, contacts, tourCrew, addTourCrew, updateTourCrew, removeTourCrew, venues, customOptions, addCustomOption, getUserRole } = useTour();
 
     const tourData = events.find(e => e.id === tourId) || (state?.eventData as Event | undefined);
+
+    const userRole = getUserRole(tourId || '');
+    const canEdit = userRole === 'admin' || userRole === 'editor';
+    const canDelete = userRole === 'admin';
+    const canShare = userRole === 'admin';
 
     const cityOptions = Array.from(new Set([...CITIES_OPT, ...(customOptions?.filter(o => o.type === 'city').map(o => o.value) || [])]));
     const countryOptions = Array.from(new Set([...COUNTRIES_OPT, ...(customOptions?.filter(o => o.type === 'country').map(o => o.value) || [])]));
@@ -459,8 +464,12 @@ const TourCities: React.FC = () => {
                                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => { setCrewModalView('group'); setSelectedContactIds([]); setGroupName(''); }} className="bg-white/10 hover:bg-white/20 text-white px-3 rounded-xl flex items-center justify-center transition-colors" title="Crear Grupo"><Briefcase size={20} /></button>
-                                            <button onClick={() => { setCrewModalView('add'); setCrewSearch(''); }} className="bg-primary hover:bg-blue-600 text-white px-3 rounded-xl flex items-center justify-center transition-colors"><Plus size={20} /></button>
+                                            {canEdit && (
+                                                <button onClick={() => { setCrewModalView('group'); setSelectedContactIds([]); setGroupName(''); }} className="bg-white/10 hover:bg-white/20 text-white px-3 rounded-xl flex items-center justify-center transition-colors" title="Crear Grupo"><Briefcase size={20} /></button>
+                                            )}
+                                            {canEdit && (
+                                                <button onClick={() => { setCrewModalView('add'); setCrewSearch(''); }} className="bg-primary hover:bg-blue-600 text-white px-3 rounded-xl flex items-center justify-center transition-colors"><Plus size={20} /></button>
+                                            )}
                                         </div>
                                     </div>
 
@@ -503,8 +512,8 @@ const TourCities: React.FC = () => {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                                                    <button onClick={() => handleEditCrew(contact)} className="p-2 text-gray-400 hover:text-white"><Pencil size={16} /></button>
-                                                                    <button onClick={() => handleDeleteCrew(contact.id)} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={16} /></button>
+                                                                    {canEdit && <button onClick={() => handleEditCrew(contact)} className="p-2 text-gray-400 hover:text-white"><Pencil size={16} /></button>}
+                                                                    {canDelete && <button onClick={() => handleDeleteCrew(contact.id)} className="p-2 text-gray-400 hover:text-red-400"><Trash2 size={16} /></button>}
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -606,21 +615,25 @@ const TourCities: React.FC = () => {
                             <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="block w-full py-3 pl-10 pr-4 text-sm rounded-xl border border-white/5 bg-surface text-white focus:ring-2 focus:ring-primary outline-none" placeholder="Buscar fecha..." />
                         </div>
                         <div className="flex gap-2 items-center">
-                            <button onClick={() => {
-                                if (confirm('¿Eliminar esta gira y todas sus fechas?')) {
-                                    deleteEvent(tourId);
-                                    navigate('/events');
-                                }
-                            }} className="p-2.5 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors" title="Eliminar Gira">
-                                <Trash2 size={18} />
-                            </button>
-                            <button onClick={() => setIsEditTourModalOpen(true)} className="p-2.5 rounded-xl border border-white/10 text-gray-400 hover:bg-white/10 hover:text-white transition-colors" title="Modificar Gira">
-                                <Pencil size={18} />
-                            </button>
-                            <div className="h-6 w-px bg-white/10 mx-1"></div>
+                            {canDelete && (
+                                <button onClick={() => {
+                                    if (confirm('¿Eliminar esta gira y todas sus fechas?')) {
+                                        deleteEvent(tourId);
+                                        navigate('/events');
+                                    }
+                                }} className="p-2.5 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors" title="Eliminar Gira">
+                                    <Trash2 size={18} />
+                                </button>
+                            )}
+                            {canEdit && (
+                                <button onClick={() => setIsEditTourModalOpen(true)} className="p-2.5 rounded-xl border border-white/10 text-gray-400 hover:bg-white/10 hover:text-white transition-colors" title="Modificar Gira">
+                                    <Pencil size={18} />
+                                </button>
+                            )}
+                            {(canDelete || canEdit) && <div className="h-6 w-px bg-white/10 mx-1"></div>}
                             <button onClick={() => { setIsCrewModalOpen(true); setCrewModalView('list'); }} className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 py-2.5 rounded-xl font-bold text-sm"><Users size={18} /> <span className="hidden sm:inline">EQUIPO</span></button>
-                            <button onClick={() => setIsShareModalOpen(true)} className="flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"><Mail size={18} /> <span className="hidden sm:inline">COMPARTIR</span></button>
-                            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg"><Plus size={18} /> <span className="hidden sm:inline">Añadir Fecha</span></button>
+                            {canShare && <button onClick={() => setIsShareModalOpen(true)} className="flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors"><Mail size={18} /> <span className="hidden sm:inline">COMPARTIR</span></button>}
+                            {canEdit && <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-primary hover:bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg"><Plus size={18} /> <span className="hidden sm:inline">Añadir Fecha</span></button>}
                             <div className="flex items-center gap-1 bg-surface border border-white/10 p-1 rounded-lg shrink-0">
                                 <button onClick={() => setViewMode('list')} className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-primary text-white' : 'text-gray-400'}`}><List size={20} /></button>
                                 <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-primary text-white' : 'text-gray-400'}`}><LayoutGrid size={20} /></button>
@@ -647,12 +660,16 @@ const TourCities: React.FC = () => {
                                         </div>
                                         <div className="p-5 relative flex-1 group">
                                             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={(e) => handleEditCity(e, item)} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors" title="Editar">
-                                                    <Pencil size={16} />
-                                                </button>
-                                                <button onClick={(e) => handleDeleteCity(e, item.id)} className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Eliminar">
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                {canEdit && (
+                                                    <button onClick={(e) => handleEditCity(e, item)} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors" title="Editar">
+                                                        <Pencil size={16} />
+                                                    </button>
+                                                )}
+                                                {canDelete && (
+                                                    <button onClick={(e) => handleDeleteCity(e, item.id)} className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Eliminar">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                             <h3 className="text-xl font-bold text-white group-hover:text-primary transition-colors pr-16">{item.location}</h3>
                                             <div className="flex flex-col gap-1">
